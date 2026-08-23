@@ -113,6 +113,7 @@ class AnnoyIndex:
         self._marks = np.zeros(n, dtype=np.int64)
         self._candidates = np.empty(n, dtype=np.int64)
         self._total_nodes = int(self._node_count.sum())
+        self._init_search_arrays()
         self._init_query_scratch()
         if self._on_disk_path is not None:
             self.save(self._on_disk_path)
@@ -249,6 +250,7 @@ class AnnoyIndex:
         self._marks = np.zeros(len(self._vectors), dtype=np.int64)
         self._candidates = np.empty(len(self._vectors), dtype=np.int64)
         self._total_nodes = int(self._node_count.sum())
+        self._init_search_arrays()
         self._init_query_scratch()
         return True
 
@@ -318,62 +320,42 @@ class AnnoyIndex:
         include_distances: bool = False,
     ):
         self._require_built()
-        value = self._as_vector(vector)
-        if value.flags.owndata:
+        value = np.asarray(vector)
+        if value.ndim != 1 or value.size != self.f:
+            raise IndexError(f"Vector has wrong length (expected {self.f}, got {value.size})")
+        if value.dtype.kind == "c":
+            raise TypeError("complex vector values are not supported")
+        if value.dtype == np.float32 and value.flags.c_contiguous:
             query = value
         else:
             query = self._query_vector
-            np.copyto(query, value, casting="no")
+            try:
+                np.copyto(query, value, casting="unsafe")
+            except (TypeError, ValueError, OverflowError) as error:
+                raise TypeError("vector values must be real numbers") from error
         want = min(max(0, int(n)), self._n_active)
         if want == 0:
             return ([], []) if include_distances else []
         budget = int(search_k)
         if budget == -1:
-            budget = 9 * want * self._n_trees // 5
+            budget = want * self._n_trees
         if budget <= 0:
             budget = 1
         total_nodes = self._total_nodes
-        budget = min(budget, self._n_active)
+        budget = min(budget, self._n_active * self._n_trees)
         heap_cap = min(total_nodes, budget + self._n_trees + 128)
-        heap_priority = self._heap_priority
-        heap_node = self._heap_node
-        heap_tree = self._heap_tree
         result_ids = self._result_ids
         result_dist = self._result_dist
         self._stamp += 1
         if self._stamp == np.iinfo(np.int64).max:
             self._marks.fill(0)
             self._stamp = 1
-        found = lib().mann_query_forest(
-            addr(self._vectors),
-            addr(self._inv_norm),
-            addr(query),
-            addr(self._perm),
-            addr(self._left),
-            addr(self._right),
-            addr(self._start),
-            addr(self._count),
-            addr(self._normals),
-            addr(self._threshold),
-            addr(self._present),
-            self.get_n_items(),
-            self.f,
-            self._n_trees,
-            self._max_nodes,
-            self._metric_code,
-            want,
-            budget,
-            self._stamp,
-            addr(self._marks),
-            addr(self._candidates),
-            addr(self._candidate_dist),
-            addr(result_ids),
-            addr(result_dist),
-            addr(heap_priority),
-            addr(heap_node),
-            addr(heap_tree),
-            heap_cap,
-        )
+        self._query_args[2] = addr(query)
+        self._query_args[16] = want
+        self._query_args[17] = budget
+        self._query_args[18] = self._stamp
+        self._query_args[27] = heap_cap
+        found = lib().mann_query_forest(addr(self._query_args))
         ids = result_ids[:found].tolist()
         if not include_distances:
             return ids
@@ -461,7 +443,46 @@ class AnnoyIndex:
         self._result_ids = np.empty(self._n_active, dtype=np.int64)
         self._result_dist = np.empty(self._n_active, dtype=np.float64)
         self._candidate_dist = np.empty(self._n_active, dtype=np.float64)
-        self._query_vector = np.empty(self.f, dtype=np.float64)
+        self._query_vector = np.empty(self.f, dtype=np.float32)
+        self._query_args = np.array(
+            [
+                addr(self._search_vectors),
+                addr(self._search_inv_norm),
+                0,
+                addr(self._perm),
+                addr(self._left),
+                addr(self._right),
+                addr(self._start),
+                addr(self._count),
+                addr(self._search_normals),
+                addr(self._search_threshold),
+                addr(self._present),
+                self.get_n_items(),
+                self.f,
+                self._n_trees,
+                self._max_nodes,
+                self._metric_code,
+                0,
+                0,
+                0,
+                addr(self._marks),
+                addr(self._candidates),
+                addr(self._candidate_dist),
+                addr(self._result_ids),
+                addr(self._result_dist),
+                addr(self._heap_priority),
+                addr(self._heap_node),
+                addr(self._heap_tree),
+                0,
+            ],
+            dtype=np.int64,
+        )
+
+    def _init_search_arrays(self) -> None:
+        self._search_vectors = np.ascontiguousarray(self._vectors, dtype=np.float32)
+        self._search_inv_norm = np.ascontiguousarray(self._inv_norm, dtype=np.float32)
+        self._search_normals = np.ascontiguousarray(self._normals, dtype=np.float32)
+        self._search_threshold = np.ascontiguousarray(self._threshold, dtype=np.float32)
 
     def _clear_forest(self) -> None:
         self._built = False
@@ -489,5 +510,10 @@ class AnnoyIndex:
             "_result_dist",
             "_candidate_dist",
             "_query_vector",
+            "_query_args",
+            "_search_vectors",
+            "_search_inv_norm",
+            "_search_normals",
+            "_search_threshold",
         ):
             self.__dict__.pop(name, None)

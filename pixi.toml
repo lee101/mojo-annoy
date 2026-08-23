@@ -18,6 +18,7 @@ mojo = "==1.1.0.dev2026081105"
 python = "3.13.*"
 pytest = "*"
 numpy = "*"
+max-core = "==26.6.0.dev2026081105"
 
 [pypi-dependencies]
 annoy = "==1.17.3"

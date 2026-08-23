@@ -89,19 +89,24 @@ Machine: Intel(R) Xeon(R) CPU E5-2697 v4 @ 2.30GHz; Linux x86_64; single process
 
 | case | mojo-annoy | upstream annoy | upstream / Mojo |
 |---|---:|---:|---:|
-| Build angular, 25k x 32, 10 trees | 110.49 ms | 253.39 ms | 2.29x |
-| 1k angular queries, k=10, default search | 135.32 ms | 30.07 ms | 0.22x |
-| 1k angular queries, k=10, search_k=1000 | 248.05 ms | 196.72 ms | 0.79x |
-| 500 euclidean queries, k=10, default | 137.65 ms | 23.81 ms | 0.17x |
+| Build angular, 25k x 32, 10 trees | 88.04 ms | 270.56 ms | 3.07x |
+| 1k angular queries, k=10, default search | 31.99 ms | 19.57 ms | 0.61x |
+| 1k angular queries, k=10, search_k=1000 | 81.17 ms | 101.53 ms | 1.25x |
+| 500 euclidean queries, k=10, default | 13.05 ms | 8.77 ms | 0.67x |
 
-No GPU path is included.
+No GPU path is included. The search kernels perform at most about three
+floating-point operations per 8 bytes read for L2 distance, well below the
+roughly 2-flop-per-byte threshold where device execution can pay for transfers
+and launch overhead.
 
 ## How it works
 
-Python owns index state and NumPy allocations. Vectors are contiguous row-major
-`float64`; tree links, permutations, leaf spans, presence bits, and scratch
-buffers are contiguous `int64`. The FFI passes those buffers to one Mojo shared
-library as integer addresses. Mojo reconstructs
+Python owns index state and NumPy allocations. Durable vectors and forest state use
+contiguous row-major `float64`; compact search mirrors use `float32`; tree links,
+permutations, leaf spans, presence bits, and scratch buffers use contiguous `int64`.
+Float32 NumPy queries cross the FFI zero-copy, while other real dtypes reuse one
+conversion buffer. A reusable packed argument block reduces each query to one C ABI
+argument. Mojo reconstructs
 `UnsafePointer[..., AnyOrigin[mut=True]]` values inside non-parametric
 `@export` functions with the C ABI.
 
@@ -109,10 +114,11 @@ Construction chooses two seeded pivots per node, forms their separating
 direction, computes each projection once, quickselects the median in place, and
 continues until leaves contain at most 32 items. Cached inverse norms avoid
 repeated angular normalization. Median splitting bounds tree depth and memory.
-Search uses a min-heap of alternative branches ordered by hyperplane margin.
-Items from reached leaves are deduplicated with a generation-mark array, then
-native-width SIMD kernels rerank squared distances and take square roots only
-for the final results. Query scratch buffers are reused. Reranking stays serial
-for normal searches and uses four workers only above both 4,096 candidates and
-262,144 candidate-dimensions. Increasing `search_k` explores more branches; a
-high enough value gives exact search.
+Search uses a max-heap ordered by the minimum signed normalized hyperplane margin
+along each path, matching upstream Annoy's traversal invariant. Items from reached
+leaves are deduplicated with a generation-mark array, then unrolled native-width
+SIMD kernels rerank squared distances with scalar tails and take square roots only
+for final results. Query scratch buffers are reused. Reranking stays serial for
+normal searches and uses four workers only above both 4,096 candidates and 262,144
+candidate-dimensions. Increasing `search_k` explores more branches; a high enough
+value gives exact search.

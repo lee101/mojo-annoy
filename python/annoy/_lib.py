@@ -15,7 +15,7 @@ F = ctypes.c_double
 
 _SIGNATURES = {
     "mann_build_forest": ([I] * 18, I),
-    "mann_query_forest": ([I] * 28, I),
+    "mann_query_forest": ([I], I),
     "mann_distance": ([I, I, I, I], F),
 }
 
@@ -38,8 +38,12 @@ def lib() -> ctypes.CDLL:
 def addr(array: np.ndarray) -> int:
     if not isinstance(array, np.ndarray):
         raise TypeError("FFI buffers must be NumPy arrays")
-    if array.dtype not in (np.dtype(np.float64), np.dtype(np.int64)):
-        raise TypeError("FFI buffers must use float64 or int64 elements")
+    if array.dtype not in (
+        np.dtype(np.float32),
+        np.dtype(np.float64),
+        np.dtype(np.int64),
+    ):
+        raise TypeError("FFI buffers must use float32, float64, or int64 elements")
     if not array.flags.c_contiguous:
         raise ValueError("FFI buffers must be C-contiguous")
     if array.size == 0 or array.ctypes.data == 0:

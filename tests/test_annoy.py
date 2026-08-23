@@ -32,7 +32,7 @@ UpstreamAnnoyIndex = _load_upstream().AnnoyIndex
 
 def test_ffi_address_rejects_incompatible_buffers():
     with pytest.raises(TypeError):
-        addr(np.ones(3, dtype=np.float32))
+        addr(np.ones(3, dtype=np.int32))
     with pytest.raises(ValueError):
         addr(np.ones((2, 2), dtype=np.float64)[:, 0])
     with pytest.raises(ValueError):
@@ -81,6 +81,19 @@ def test_simd_tail_distance_matches_upstream(metric):
         assert ours.get_distance(i, j) == pytest.approx(
             upstream.get_distance(i, j), rel=2e-6, abs=2e-6
         )
+
+
+def test_float32_query_is_zero_copy_and_conversion_buffer_is_reused():
+    rng = np.random.default_rng(82)
+    data = rng.normal(size=(100, 13))
+    index, _ = _pair("euclidean", data, trees=2)
+    query32 = np.ascontiguousarray(data[7], dtype=np.float32)
+    index._query_vector.fill(np.nan)
+    assert index.get_nns_by_vector(query32, 5, search_k=1000)[0] == 7
+    assert np.isnan(index._query_vector).all()
+    query64 = np.ascontiguousarray(data[8], dtype=np.float64)
+    assert index.get_nns_by_vector(query64, 5, search_k=1000)[0] == 8
+    assert np.array_equal(index._query_vector, query64.astype(np.float32))
 
 
 def test_parallel_rerank_threshold_matches_exact_result():

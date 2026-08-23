@@ -75,6 +75,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/typing_extensions-4.16.0-pyhcf101f3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/tzdata-2026c-h151e31d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/zipp-4.1.0-pyhcf101f3_0.conda
+      - conda: https://conda.modular.com/max-nightly/linux-64/max-core-26.6.0.dev2026081105-release.conda
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.1.0.dev2026081105-release.conda
       - conda: https://conda.modular.com/max-nightly/linux-64/mojo-compiler-1.1.0.dev2026081105-release.conda
       - conda: https://conda.modular.com/max-nightly/noarch/mblack-26.6.0.dev2026081105-release.conda
@@ -850,6 +851,15 @@ packages:
   - pkg:pypi/zipp?source=hash-mapping
   size: 24190
   timestamp: 1779159948016
+- conda: https://conda.modular.com/max-nightly/linux-64/max-core-26.6.0.dev2026081105-release.conda
+  sha256: c5d72d932f782f1b7f17739af7dc1d4694a1fb628f7476ecdffe23a7ebb040b1
+  md5: da7f61f83c2fa729b6ff88662d1c8ca1
+  depends:
+  - mojo-compiler ==1.1.0.dev2026081105
+  license: LicenseRef-Modular-Proprietary
+  run_exports: {}
+  size: 119004741
+  timestamp: 1786426706833
 - conda: https://conda.modular.com/max-nightly/linux-64/mojo-1.1.0.dev2026081105-release.conda
   sha256: ce381830cb742dfef411e21cc86782dd78814045d1884a140e30469d54b3fed2
   md5: c446ed479e92860e01f534d6707fd830
