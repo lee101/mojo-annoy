@@ -1,7 +1,6 @@
 """Random-projection forest construction, search, and distance kernels."""
 
 from std.math import sqrt
-from std.algorithm import parallelize
 from std.sys import simd_width_of
 
 comptime FPtr = UnsafePointer[Float64, AnyOrigin[mut=True]]
@@ -439,32 +438,16 @@ def mann_query_forest(
     if metric == 0:
         var squared = dot(query, query, d)
         query_inv_norm = 0.0 if squared == 0.0 else 1.0 / sqrt(squared)
-    if candidate_count >= 4096 and candidate_count * d >= 262144:
-        @parameter
-        def score_candidate(c: Int):
-            var item = Int(candidates[c])
-            candidate_dist[c] = metric_rank_distance(
-                vectors + item * d,
-                query,
-                d,
-                metric,
-                vector_norms[item],
-                query_inv_norm,
-            )
-
-        parallelize[score_candidate](candidate_count, 4)
     for c in range(candidate_count):
         var item = Int(candidates[c])
-        var distance = candidate_dist[c]
-        if candidate_count < 4096 or candidate_count * d < 262144:
-            distance = metric_rank_distance(
-                vectors + item * d,
-                query,
-                d,
-                metric,
-                vector_norms[item],
-                query_inv_norm,
-            )
+        var distance = metric_rank_distance(
+            vectors + item * d,
+            query,
+            d,
+            metric,
+            vector_norms[item],
+            query_inv_norm,
+        )
         if distance > result_dist[want - 1]:
             continue
         var pos = want - 1
