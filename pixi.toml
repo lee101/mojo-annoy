@@ -9,6 +9,9 @@ version = "0.1.0"
 build = "bash build/build.sh"
 test = "python -m pytest tests -q"
 bench = "flock /tmp/mojo-bench.lock python bench/bench.py"
+bench-parallel = "python bench/parallel_sweep.py"
+bench-project = "python bench/project_probe.py"
+bench-rerank = "python bench/rerank_probe.py"
 
 [activation.env]
 PYTHONPATH = "python"

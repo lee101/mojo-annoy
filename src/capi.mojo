@@ -1,7 +1,7 @@
 """Random-projection forest construction, search, and distance kernels."""
 
 from std.math import sqrt
-from max.algorithm import sync_parallelize
+from max.algorithm import parallelize
 from std.sys import simd_width_of
 
 comptime FPtr = UnsafePointer[Float64, AnyOrigin[mut=True]]
@@ -9,8 +9,11 @@ comptime F32Ptr = UnsafePointer[Float32, AnyOrigin[mut=True]]
 comptime IPtr = UnsafePointer[Int64, AnyOrigin[mut=True]]
 comptime W = simd_width_of[DType.float64]()
 comptime W32 = simd_width_of[DType.float32]()
-comptime RERANK_PARALLEL_CANDIDATES = 4_096
-comptime RERANK_PARALLEL_WORK = 262_144
+# Rerank-parallelism gate: a query whose deduplicated candidate count reaches
+# both limits reranks on RERANK_WORKERS threads. The candidate-count crossover
+# is measured (bench/rerank_probe.py).
+comptime RERANK_PARALLEL_CANDIDATES = 65_536
+comptime RERANK_PARALLEL_WORK = 2_097_152
 comptime RERANK_WORKERS = 4
 
 
@@ -585,27 +588,30 @@ def mann_query_forest(args_addr: Int) abi("C") -> Int:
     if metric == 0:
         var squared = dot32(query, query, d)
         query_inv_norm = 0.0 if squared == 0.0 else 1.0 / sqrt(squared)
+    # Above the measured candidate-count crossover the remaining budget is
+    # spread over RERANK_WORKERS equal ranges. Every candidate is scored by the
+    # same kernel into its own slot, so this is bit-identical to the serial
+    # loop below; below the gate `parallel_rerank` is False and that loop
+    # scores inline, which keeps small searches free of any parallel machinery.
     var parallel_rerank = (
         candidate_count >= RERANK_PARALLEL_CANDIDATES
         and candidate_count * d >= RERANK_PARALLEL_WORK
     )
     if parallel_rerank:
         def work(worker: Int) {var vectors, var vector_norms, var query, var candidates, var candidate_dist, var candidate_count, var d, var metric, var query_inv_norm}:
-            var begin = worker * candidate_count // RERANK_WORKERS
-            var end = (worker + 1) * candidate_count // RERANK_WORKERS
             rerank_range(
                 vectors,
                 vector_norms,
                 query,
                 candidates,
                 candidate_dist,
-                begin,
-                end,
+                worker * candidate_count // RERANK_WORKERS,
+                (worker + 1) * candidate_count // RERANK_WORKERS,
                 d,
                 metric,
                 query_inv_norm,
             )
-        sync_parallelize(work, RERANK_WORKERS)
+        parallelize(work, RERANK_WORKERS, RERANK_WORKERS)
     for c in range(candidate_count):
         var item = Int(candidates[c])
         var distance = candidate_dist[c] if parallel_rerank else Float64(metric_rank_distance32(
