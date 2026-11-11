@@ -33,14 +33,14 @@ def dot(a: FPtr, b: FPtr, n: Int) -> Float64:
     var acc3 = SIMD[DType.float64, W](0.0)
     var i = 0
     while i + 4 * W <= n:
-        acc0 += a.load[width=W](i) * b.load[width=W](i)
-        acc1 += a.load[width=W](i + W) * b.load[width=W](i + W)
-        acc2 += a.load[width=W](i + 2 * W) * b.load[width=W](i + 2 * W)
-        acc3 += a.load[width=W](i + 3 * W) * b.load[width=W](i + 3 * W)
+        acc0 += a.unsafe_load[width=W](i) * b.unsafe_load[width=W](i)
+        acc1 += a.unsafe_load[width=W](i + W) * b.unsafe_load[width=W](i + W)
+        acc2 += a.unsafe_load[width=W](i + 2 * W) * b.unsafe_load[width=W](i + 2 * W)
+        acc3 += a.unsafe_load[width=W](i + 3 * W) * b.unsafe_load[width=W](i + 3 * W)
         i += 4 * W
     var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
     while i + W <= n:
-        total += (a.load[width=W](i) * b.load[width=W](i)).reduce_add()
+        total += (a.unsafe_load[width=W](i) * b.unsafe_load[width=W](i)).reduce_add()
         i += W
     while i < n:
         total += a[i] * b[i]
@@ -55,14 +55,14 @@ def dot32(a: F32Ptr, b: F32Ptr, n: Int) -> Float32:
     var acc3 = SIMD[DType.float32, W32](0.0)
     var i = 0
     while i + 4 * W32 <= n:
-        acc0 += a.load[width=W32](i) * b.load[width=W32](i)
-        acc1 += a.load[width=W32](i + W32) * b.load[width=W32](i + W32)
-        acc2 += a.load[width=W32](i + 2 * W32) * b.load[width=W32](i + 2 * W32)
-        acc3 += a.load[width=W32](i + 3 * W32) * b.load[width=W32](i + 3 * W32)
+        acc0 += a.unsafe_load[width=W32](i) * b.unsafe_load[width=W32](i)
+        acc1 += a.unsafe_load[width=W32](i + W32) * b.unsafe_load[width=W32](i + W32)
+        acc2 += a.unsafe_load[width=W32](i + 2 * W32) * b.unsafe_load[width=W32](i + 2 * W32)
+        acc3 += a.unsafe_load[width=W32](i + 3 * W32) * b.unsafe_load[width=W32](i + 3 * W32)
         i += 4 * W32
     var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
     while i + W32 <= n:
-        total += (a.load[width=W32](i) * b.load[width=W32](i)).reduce_add()
+        total += (a.unsafe_load[width=W32](i) * b.unsafe_load[width=W32](i)).reduce_add()
         i += W32
     while i < n:
         total += a[i] * b[i]
@@ -93,10 +93,10 @@ def metric_rank_distance32(
         var acc3 = SIMD[DType.float32, W32](0.0)
         var i = 0
         while i + 4 * W32 <= d:
-            var delta0 = a.load[width=W32](i) - b.load[width=W32](i)
-            var delta1 = a.load[width=W32](i + W32) - b.load[width=W32](i + W32)
-            var delta2 = a.load[width=W32](i + 2 * W32) - b.load[width=W32](i + 2 * W32)
-            var delta3 = a.load[width=W32](i + 3 * W32) - b.load[width=W32](i + 3 * W32)
+            var delta0 = a.unsafe_load[width=W32](i) - b.unsafe_load[width=W32](i)
+            var delta1 = a.unsafe_load[width=W32](i + W32) - b.unsafe_load[width=W32](i + W32)
+            var delta2 = a.unsafe_load[width=W32](i + 2 * W32) - b.unsafe_load[width=W32](i + 2 * W32)
+            var delta3 = a.unsafe_load[width=W32](i + 3 * W32) - b.unsafe_load[width=W32](i + 3 * W32)
             acc0 += delta0 * delta0
             acc1 += delta1 * delta1
             acc2 += delta2 * delta2
@@ -104,7 +104,7 @@ def metric_rank_distance32(
             i += 4 * W32
         var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
         while i + W32 <= d:
-            var delta = a.load[width=W32](i) - b.load[width=W32](i)
+            var delta = a.unsafe_load[width=W32](i) - b.unsafe_load[width=W32](i)
             total += (delta * delta).reduce_add()
             i += W32
         while i < d:
@@ -119,14 +119,14 @@ def metric_rank_distance32(
         var acc3 = SIMD[DType.float32, W32](0.0)
         var i = 0
         while i + 4 * W32 <= d:
-            acc0 += abs(a.load[width=W32](i) - b.load[width=W32](i))
-            acc1 += abs(a.load[width=W32](i + W32) - b.load[width=W32](i + W32))
-            acc2 += abs(a.load[width=W32](i + 2 * W32) - b.load[width=W32](i + 2 * W32))
-            acc3 += abs(a.load[width=W32](i + 3 * W32) - b.load[width=W32](i + 3 * W32))
+            acc0 += abs(a.unsafe_load[width=W32](i) - b.unsafe_load[width=W32](i))
+            acc1 += abs(a.unsafe_load[width=W32](i + W32) - b.unsafe_load[width=W32](i + W32))
+            acc2 += abs(a.unsafe_load[width=W32](i + 2 * W32) - b.unsafe_load[width=W32](i + 2 * W32))
+            acc3 += abs(a.unsafe_load[width=W32](i + 3 * W32) - b.unsafe_load[width=W32](i + 3 * W32))
             i += 4 * W32
         var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
         while i + W32 <= d:
-            total += abs(a.load[width=W32](i) - b.load[width=W32](i)).reduce_add()
+            total += abs(a.unsafe_load[width=W32](i) - b.unsafe_load[width=W32](i)).reduce_add()
             i += W32
         while i < d:
             total += abs(a[i] - b[i])
@@ -176,10 +176,10 @@ def metric_rank_distance(
         var acc3 = SIMD[DType.float64, W](0.0)
         var i = 0
         while i + 4 * W <= d:
-            var delta0 = a.load[width=W](i) - b.load[width=W](i)
-            var delta1 = a.load[width=W](i + W) - b.load[width=W](i + W)
-            var delta2 = a.load[width=W](i + 2 * W) - b.load[width=W](i + 2 * W)
-            var delta3 = a.load[width=W](i + 3 * W) - b.load[width=W](i + 3 * W)
+            var delta0 = a.unsafe_load[width=W](i) - b.unsafe_load[width=W](i)
+            var delta1 = a.unsafe_load[width=W](i + W) - b.unsafe_load[width=W](i + W)
+            var delta2 = a.unsafe_load[width=W](i + 2 * W) - b.unsafe_load[width=W](i + 2 * W)
+            var delta3 = a.unsafe_load[width=W](i + 3 * W) - b.unsafe_load[width=W](i + 3 * W)
             acc0 += delta0 * delta0
             acc1 += delta1 * delta1
             acc2 += delta2 * delta2
@@ -187,7 +187,7 @@ def metric_rank_distance(
             i += 4 * W
         var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
         while i + W <= d:
-            var delta = a.load[width=W](i) - b.load[width=W](i)
+            var delta = a.unsafe_load[width=W](i) - b.unsafe_load[width=W](i)
             total += (delta * delta).reduce_add()
             i += W
         while i < d:
@@ -202,14 +202,14 @@ def metric_rank_distance(
         var acc3 = SIMD[DType.float64, W](0.0)
         var i = 0
         while i + 4 * W <= d:
-            acc0 += abs(a.load[width=W](i) - b.load[width=W](i))
-            acc1 += abs(a.load[width=W](i + W) - b.load[width=W](i + W))
-            acc2 += abs(a.load[width=W](i + 2 * W) - b.load[width=W](i + 2 * W))
-            acc3 += abs(a.load[width=W](i + 3 * W) - b.load[width=W](i + 3 * W))
+            acc0 += abs(a.unsafe_load[width=W](i) - b.unsafe_load[width=W](i))
+            acc1 += abs(a.unsafe_load[width=W](i + W) - b.unsafe_load[width=W](i + W))
+            acc2 += abs(a.unsafe_load[width=W](i + 2 * W) - b.unsafe_load[width=W](i + 2 * W))
+            acc3 += abs(a.unsafe_load[width=W](i + 3 * W) - b.unsafe_load[width=W](i + 3 * W))
             i += 4 * W
         var total = (acc0 + acc1 + acc2 + acc3).reduce_add()
         while i + W <= d:
-            total += abs(a.load[width=W](i) - b.load[width=W](i)).reduce_add()
+            total += abs(a.unsafe_load[width=W](i) - b.unsafe_load[width=W](i)).reduce_add()
             i += W
         while i < d:
             total += abs(a[i] - b[i])
@@ -288,8 +288,8 @@ def make_normal(
     var j = 0
     while j + W <= d:
         var value = (
-            vectors.load[width=W](a * d + j) * norm_a
-            - vectors.load[width=W](b * d + j) * norm_b
+            vectors.unsafe_load[width=W](a * d + j) * norm_a
+            - vectors.unsafe_load[width=W](b * d + j) * norm_b
         )
         normal.store(j, value)
         norm_acc += value * value
@@ -315,7 +315,7 @@ def make_normal(
         var scale = SIMD[DType.float64, W](inverse_norm)
         j = 0
         while j + W <= d:
-            normal.store(j, normal.load[width=W](j) * scale)
+            normal.store(j, normal.unsafe_load[width=W](j) * scale)
             j += W
         while j < d:
             normal[j] *= inverse_norm
