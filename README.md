@@ -94,10 +94,41 @@ Machine: Intel(R) Xeon(R) CPU E5-2697 v4 @ 2.30GHz; Linux x86_64; single process
 | 1k angular queries, k=10, search_k=1000 | 81.17 ms | 101.53 ms | 1.25x |
 | 500 euclidean queries, k=10, default | 13.05 ms | 8.77 ms | 0.67x |
 
-No GPU path is included. The search kernels perform at most about three
-floating-point operations per 8 bytes read for L2 distance, well below the
-roughly 2-flop-per-byte threshold where device execution can pay for transfers
-and launch overhead.
+### GPU
+
+**CPU only: memory-bound.** No GPU path is included, and none is warranted on
+this port.
+
+The gate comes from `bench/analysis.md` §2 and §6, which model flopped work
+against bytes touched for every kernel measured at real caller sizes (25 000 ×
+32 angular with 10 trees, 1 000 queries at k=10; 10 000 × 32 euclidean, 500
+queries):
+
+| kernel region | flops/byte (measured model) |
+|---|---:|
+| coarse internal-node `dot32`, default budget | 0.49 |
+| fine candidate scan + rerank, default budget | 1.98 |
+| deep search traversal (`search_k=1000`) | 0.53 |
+| `mann_build_forest` tree projections | 0.65 |
+| hamming distance | ~0.5 |
+
+The highest ratio anywhere is 1.98, for the rerank inner loop at the smallest
+benchmarked dimension (f=32, which is `2·f` flops over `2·f·4` bytes); it falls
+toward 0.25 as f grows. That is below the roughly 2-flop-per-byte bar, so no
+kernel here can absorb a transfer. The default query moves only 10–27 KB of
+`normals` and `perm` and the rerank touches ~4.3 µs of a ~17–19 µs kernel, so
+even a zero-cost launch would lose to the one-copy-in/copy-out cost. The
+analysis attributes the hot rows to pointer-chasing latency at 1.0–3.7 GB/s
+effective against a 7.8–9.4 GB/s streaming baseline, not to arithmetic.
+
+Device check: `nvidia-smi --query-gpu=memory.free` reported 5486 MiB free when
+this decision was recorded, so the shared GPU met the 4000 MiB floor; the gate
+above, not device availability, is the reason for stopping. There is no device
+code to measure, so there are no GPU before/after numbers: the numbers above are
+the existing CPU measurements from `pixi run bench` and `bench/analysis.md`, and
+both rows where the port trails upstream (angular 0.61x, euclidean 0.67x) are
+attributed there to Python/ctypes glue and issue-bound traversal. No GPU tests
+were written, so a test run neither exercises nor skips a GPU device.
 
 ## How it works
 
